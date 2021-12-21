@@ -197,6 +197,62 @@ public class RepositoryIntegrationTests {
 		check(de, 2, 0);
 	}
 
+	@Test
+	public void findRevisionFetchesMostRecentVersionsBeforeRevision() {
+
+		Country uk = new Country();
+		uk.code = "uk";
+		uk.name = "United Kingdom";
+
+		Country de = new Country();
+		de.code = "de";
+		de.name = "Deutschland";
+
+		countryRepository.save(uk);
+		Revisions<Integer, Country> ukRevisions = countryRepository.findRevisions(uk.id);
+		assertThat(ukRevisions).hasSize(1);
+		assertThat(ukRevisions)
+				.first()
+				.extracting(Revision::getRequiredRevisionNumber)
+				.isEqualTo(1);
+
+		countryRepository.save(de);
+		Revisions<Integer, Country> deRevisions = countryRepository.findRevisions(de.id);
+		assertThat(deRevisions).hasSize(1);
+		assertThat(deRevisions)
+				.first()
+				.extracting(Revision::getRequiredRevisionNumber)
+				.isEqualTo(2);
+
+		uk.name = "United Kingdom of Great Britain and Northern Ireland";
+		countryRepository.save(uk);
+
+		countryRepository.save(uk);
+		ukRevisions = countryRepository.findRevisions(uk.id);
+		assertThat(ukRevisions).hasSize(2);
+		assertThat(ukRevisions)
+				.extracting(Revision::getRequiredRevisionNumber)
+				.containsExactly(1, 3);
+
+		assertThat(countryRepository.findRevision(uk.id, 1))
+				.isPresent()
+				.get()
+				.extracting(Revision::getRequiredRevisionNumber)
+				.isEqualTo(1);
+
+		assertThat(countryRepository.findRevision(uk.id, 3))
+				.isPresent()
+				.get()
+				.extracting(Revision::getRequiredRevisionNumber)
+				.isEqualTo(3);
+
+		assertThat(countryRepository.findRevision(uk.id, 2))
+				.isPresent()
+				.get()
+				.extracting(Revision::getRequiredRevisionNumber)
+				.isEqualTo(2);
+	}
+
 	void check(Country de, int page, int expectedSize) {
 
 		Page<Revision<Integer, Country>> revisions = countryRepository.findRevisions(de.id, PageRequest.of(page, 1));
